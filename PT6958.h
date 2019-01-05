@@ -8,16 +8,6 @@ namespace PT6958
 
 static const uint8_t RAM_SIZE = 10;
 
-struct RamBuffer
-{
-    uint8_t _data[RAM_SIZE] = {0};
-
-    inline void Set(uint8_t index, uint8_t data)
-    {
-        _data[index] = data;
-    }
-};
-
 class LedDriver
 {
 private:
@@ -32,65 +22,22 @@ private:
 
 
 public:
-    LedDriver( uint8_t csPin ) : _csPin(csPin)
-    {
-        SPI.begin();
-        pinMode(_csPin, OUTPUT);
-        EndSpi();
-    }
+    // set CS pin for SPI
+    LedDriver( uint8_t csPin );
 
-    void UpdateRam(const RamBuffer &ram)
-    {
-        SetMode(CMD_MODE_WRITE_INCREMENT);
+    // address 0..9
+    // max size < 10
+    // address + size <= RAM_SIZE(10)
+    void Set(uint8_t address, const uint8_t *p, uint8_t size);
 
-        StartSpi();
-        SPI.transfer(CMD_SET_ADDR_0);
-        for(uint8_t i = 0; i < RAM_SIZE; i++)
-            SPI.transfer(ram._data[i]);
-        EndSpi();
-    }
+    // address 0..9
+    void Set(uint8_t address, uint8_t data);
 
-    void UpdateRam(uint8_t address, uint8_t data)
-    {
-        if(address >= RAM_SIZE)
-            address = RAM_SIZE - 1;
+    // fill RAM with 0
+    void ResetRam();
 
-        SetMode(CMD_MODE_WRITE_FIXED_ADDRESS);
-        StartSpi();
-        SPI.transfer(CMD_SET_ADDR_0 + address);
-        SPI.transfer(data);
-        EndSpi();
-    }
-
-    void ResetRam()
-    {
-        SetMode(CMD_MODE_WRITE_INCREMENT);
-        StartSpi();
-        SPI.transfer(CMD_SET_ADDR_0);
-        for(uint8_t i = 0; i < RAM_SIZE; i++)
-            SPI.transfer(0);
-        EndSpi();
-    }
-
-    void DisplayOff()
-    {
-        SendCommand(CMD_DISPLAY_OFF);
-    }
-
-    uint32_t ReadKeyboard()
-    {
-        uint32_t data = 0;
-        StartSpi();
-        SPI.transfer(CMD_MODE_READ);
-        delayMicroseconds(1);
-        for(uint8_t i = 0; i < 3; i++)
-        {
-            data <<= i;
-            data |= SPI.transfer(0);
-        }
-        EndSpi();
-        return data;
-    }
+    // read pin data into low 3 bytes
+    uint32_t ReadKeyboard();
 
     // brightness 0..7
     // 000: Pulse width = 1/16
@@ -101,41 +48,19 @@ public:
     // 101: Pulse width = 12/16
     // 110: Pulse width = 13/16
     // 111: Pulse width = 14/16
-    void DisplayOn( uint8_t brightness )
-    {
-        SendCommand(CMD_DISPLAY_ON | (brightness & CMD_DISPLAY_ON_MASK) );
-    }
+    void DisplayOn( uint8_t brightness );
+
+    void DisplayOff();
 
 private:
     uint8_t _csPin;
     uint8_t _lastMode = 0;
 
-    void StartSpi()
-    {
-        SPI.beginTransaction(SPISettings(1000000, LSBFIRST, SPI_MODE2)); 
-        digitalWrite(_csPin, LOW);
-    }
+    void StartSpi();
+    void EndSpi();
 
-    void EndSpi()
-    {
-        digitalWrite(_csPin, HIGH);
-        SPI.endTransaction();
-    }
-
-    void SetMode(uint8_t mode)
-    {
-        if(_lastMode == mode)
-            return;
-        SendCommand(mode);
-        _lastMode = mode;
-    }
-
-    void SendCommand(uint8_t cmd)
-    {
-        StartSpi();
-        SPI.transfer(cmd);
-        EndSpi();
-    }
+    void SetMode(uint8_t mode);
+    void SendCommand(uint8_t cmd);
 };
 
 }
